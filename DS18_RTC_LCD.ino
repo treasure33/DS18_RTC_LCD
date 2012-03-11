@@ -26,7 +26,14 @@ B00000,
 // initialize the library with the numbers of the interface pins
 LiquidCrystalRus lcd(12, 11, 5, 4, 3, 2);
 
-float getTemperature()
+void converttall()
+{
+  ds.reset();
+  ds.skip();
+  ds.write(0x44,1);         // start conversion, with parasite power on at the end  
+}
+
+float getTemperature(bool convertt=1)
 {
   byte i;
   byte present = 0;
@@ -76,12 +83,12 @@ float getTemperature()
       return celsius;
   }
 
-  ds.reset();
-  ds.select(addr);
-  ds.write(0x44,1);         // start conversion, with parasite power on at the end
-  
-  delay(1000);     // maybe 750ms is enough, maybe not
+  if (convertt) 
+  {
+    converttall();
+    delay(750);     // maybe 750ms is enough, maybe not
   // we might do a ds.depower() here, but the reset will take care of it.
+  }
   
   present = ds.reset();
   ds.select(addr);    
@@ -127,7 +134,7 @@ void setup() {
   lcd.begin(16, 2);
   lcd.clear();
   lcd.createChar(1, gradus);
-  
+    
   Wire.begin();
   RTC.begin(); 
   
@@ -136,12 +143,14 @@ void setup() {
     // following line sets the RTC to the date & time this sketch was compiled
 //    RTC.adjust(DateTime(__DATE__, __TIME__));
   }
+  converttall();
+  delay(750);
+  lastTemperature = getTemperature(0);
 }
 
 void loop() {
   
   DateTime now = RTC.now();
-  
   char stringOne[17] = "";
   char stringTwo[17] = "";
   
@@ -156,12 +165,20 @@ void loop() {
   }
 
   // get ds18b20 temperature data on one minute period
-  if (now.minute()!=prev.minute())
-    lastTemperature = getTemperature();
-  
+    
+  if (now.second()%10==9 && now.second()!=prev.second()) // every 10 (in 9-th) second send convertt command to 1-wire
+  {
+    converttall();
+  }
+
+  if (now.second()%10==0 && now.second()!=prev.second())   // every 10 (in 10-th) second read convertt result from 1-wire
+  {
+    lastTemperature = getTemperature(0);
+  }
+
   lcd.setCursor(0, 1);
   int t = (lastTemperature - (int)lastTemperature) * 100 ;
-  sprintf(stringTwo,"%02d:%02d:%02d %02d.%02d%cC", now.hour(), now.minute(), now.second(), (int)lastTemperature, abs(t),1);
+  sprintf(stringTwo,"%02d:%02d:%02d %c%02d.%02d%c", now.hour(), now.minute(), now.second(), lastTemperature<0?'-':'+', abs((int)lastTemperature), abs(t),1);
   lcd.print(stringTwo);    
   prev = now; 
 }
