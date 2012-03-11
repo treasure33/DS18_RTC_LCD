@@ -109,6 +109,9 @@ float getTemperature(bool convertt=1)
   // convert the data to actual temperature
 
   unsigned int raw = (data[1] << 8) | data[0];
+  Serial.print("raw=");
+  Serial.print(raw);
+
   if (type_s) {
     raw = raw << 3; // 9 bit resolution default
     if (data[7] == 0x10) {
@@ -121,8 +124,22 @@ float getTemperature(bool convertt=1)
     else if (cfg == 0x20) raw = raw << 2; // 10 bit res, 187.5 ms
     else if (cfg == 0x40) raw = raw << 1; // 11 bit res, 375 ms
     // default is 12 bit resolution, 750 ms conversion time
+  } 
+  Serial.print(" raw=");
+  Serial.print(raw);
+  int sign = 1;
+  if (data[1]&128)
+  {
+    raw = ~raw+1;
+    sign=-1;
   }
-  celsius = (float)raw / 16.0;
+  
+  Serial.print(" raw=");
+  Serial.print(raw);    
+  Serial.println();
+
+    
+  celsius = (sign==-1?(float)raw / 16.0 * (float) sign: (float)raw / 16.0);
   
   return celsius;
 }
@@ -174,11 +191,12 @@ void loop() {
   if (now.second()%10==0 && now.second()!=prev.second())   // every 10 (in 10-th) second read convertt result from 1-wire
   {
     lastTemperature = getTemperature(0);
+    Serial.println(lastTemperature);
   }
 
   lcd.setCursor(0, 1);
   int t = (lastTemperature - (int)lastTemperature) * 100 ;
-  sprintf(stringTwo,"%02d:%02d:%02d %c%02d.%02d%c", now.hour(), now.minute(), now.second(), lastTemperature<0?'-':'+', abs((int)lastTemperature), abs(t),1);
+  sprintf(stringTwo,"%02d:%02d:%02d %c%02d.%02d%c", now.hour(), now.minute(), now.second(), lastTemperature<0?'-':(lastTemperature==0?' ':'+'), abs((int)lastTemperature), abs(t),1);
   lcd.print(stringTwo);    
   prev = now; 
 }
